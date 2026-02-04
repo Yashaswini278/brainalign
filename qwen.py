@@ -28,6 +28,8 @@ grid_path = args.grid_path
 respdict_path = args.respdict_path
 output_dir = base_dir / args.output_dir
 
+print(base_dir / respdict_path)
+
 with open(base_dir / respdict_path, "r") as f:
     respdict = json.load(f)
 
