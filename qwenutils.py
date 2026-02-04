@@ -24,6 +24,9 @@ def embed_text_qwen_all_layers(chunks, model, tokenizer, batch_size=1):
         cumulative_text = ""
         
         for i, chunk in enumerate(chunks):
+            # Skip empty chunks
+            if not chunk or not chunk.strip():
+                continue
             # Add current chunk to cumulative context
             if cumulative_text:
                 cumulative_text += " " + chunk
