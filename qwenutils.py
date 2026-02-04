@@ -21,14 +21,12 @@ def embed_text_qwen_all_layers(chunks, model, tokenizer, batch_size=1):
     print(f"  Model max context length: {max_length}")
     print(f"  Number of layers: {num_layers}")
 
-    all_layers_embeddings = [[] for _ in range(num_layers)]
+    chunk_embeddings = []
     cumulative_text = ""
     
-        
+    chunks = chunks[10:-5]   
+
     for i, chunk in enumerate(chunks):
-        # Skip empty chunks
-        if not chunk or not chunk.strip():
-            continue
         # Add current chunk to cumulative context
         if cumulative_text:
             cumulative_text += " " + chunk
@@ -50,17 +48,21 @@ def embed_text_qwen_all_layers(chunks, model, tokenizer, batch_size=1):
         # Get hidden states
         with torch.no_grad():
             outputs = model(**inputs, output_hidden_states=True)
+            layers_for_this_chunk = []
             # Extract the last token embedding from each layer
             for layer_idx in range(num_layers):
                 hidden_states = outputs.hidden_states[layer_idx]
                 last_token_embedding = hidden_states[0, -1, :].float().cpu().numpy()
-                all_layers_embeddings[layer_idx].append(last_token_embedding)
+                layers_for_this_chunk.append(last_token_embedding)
+
+            chunk_embedding = np.concatenate(layers_for_this_chunk)
+            chunk_embeddings.append(chunk_embedding)
         
         # Progress indicator
-        if (i + 1) % 10 == 0:
+        if (i + 1) % 50 == 0:
             print(f"  Processed {i + 1}/{len(chunks)} chunks")
     
-    all_layers_embeddings = np.array([np.array(layer_embs) for layer_embs in all_layers_embeddings])
-    print(f"  Final shape: {all_layers_embeddings.shape} (layers, chunks, hidden_size)")
+    all_embeddings = np.stack(chunk_embeddings)
+    print(f"  Final shape: {all_embeddings.shape} (chunks, layers*hidden_size)")
 
-    return all_layers_embeddings
+    return all_embeddings
