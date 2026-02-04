@@ -19,43 +19,48 @@ def embed_text_qwen_all_layers(chunks, model, tokenizer, batch_size=1):
     num_layers = model.config.num_hidden_layers
     max_length = model.config.max_position_embeddings
     print(f"  Model max context length: {max_length}")
+    print(f"  Number of layers: {num_layers}")
+
     all_layers_embeddings = []
+    cumulative_text = ""
     
-    for layer_idx in range(num_layers):
-        layer_embeddings = []
-        cumulative_text = ""
         
-        for i, chunk in enumerate(chunks):
-            # Skip empty chunks
-            if not chunk or not chunk.strip():
-                continue
-            # Add current chunk to cumulative context
-            if cumulative_text:
-                cumulative_text += " " + chunk
-            else:
-                cumulative_text = chunk
-            
-            # Tokenize the cumulative text
-            inputs = tokenizer(
-                            cumulative_text, 
-                            return_tensors="pt", 
-                            truncation=True, 
-                            max_length=max_length,  # Use model's actual max length
-                            padding=False,
-                            add_special_tokens=True
-                        )            
-            inputs = {k: v.to(model.device) for k, v in inputs.items()}
-            
-            # Get hidden states
-            with torch.no_grad():
-                outputs = model(**inputs, output_hidden_states=True)
-                hidden_states = outputs.hidden_states[layer_idx]  # Shape: (batch, seq_len, hidden_size)
-                
-                # Get the last token's embedding (most recent context)
+    for i, chunk in enumerate(chunks):
+        # Skip empty chunks
+        if not chunk or not chunk.strip():
+            continue
+        # Add current chunk to cumulative context
+        if cumulative_text:
+            cumulative_text += " " + chunk
+        else:
+            cumulative_text = chunk
+        
+        # Tokenize the cumulative text
+        inputs = tokenizer(
+                        cumulative_text, 
+                        return_tensors="pt", 
+                        truncation=True, 
+                        max_length=max_length,  
+                        padding=False,
+                        add_special_tokens=True
+                    )
+                   
+        inputs = {k: v.to(model.device) for k, v in inputs.items()}
+        
+        # Get hidden states
+        with torch.no_grad():
+            outputs = model(**inputs, output_hidden_states=True)
+            # Extract the last token embedding from each layer
+            for layer_idx in range(num_layers):
+                hidden_states = outputs.hidden_states[layer_idx]
                 last_token_embedding = hidden_states[0, -1, :].float().cpu().numpy()
-                layer_embeddings.append(last_token_embedding)
+                all_layers_embeddings[layer_idx].append(last_token_embedding)
         
-        all_layers_embeddings.append(np.array(layer_embeddings))
-        print(f"  Completed layer {layer_idx}/{num_layers-1}")
+        # Progress indicator
+        if (i + 1) % 10 == 0:
+            print(f"  Processed {i + 1}/{len(chunks)} chunks")
     
-    return np.array(all_layers_embeddings)
+    all_layers_embeddings = np.array([np.array(layer_embs) for layer_embs in all_layers_embeddings])
+    print(f"  Final shape: {all_layers_embeddings.shape} (layers, chunks, hidden_size)")
+
+    return all_layers_embeddings
