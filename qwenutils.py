@@ -16,7 +16,9 @@ def embed_text_qwen_all_layers(chunks, model, tokenizer, batch_size=1):
         numpy array of shape (n_layers, n_chunks, hidden_size)
     """
 
-    num_layers = 36
+    num_layers = model.config.num_hidden_layers
+    max_length = model.config.max_position_embeddings
+    print(f"  Model max context length: {max_length}")
     all_layers_embeddings = []
     
     for layer_idx in range(num_layers):
@@ -34,7 +36,14 @@ def embed_text_qwen_all_layers(chunks, model, tokenizer, batch_size=1):
                 cumulative_text = chunk
             
             # Tokenize the cumulative text
-            inputs = tokenizer(cumulative_text, return_tensors="pt", truncation=True, max_length=2048)
+            inputs = tokenizer(
+                            cumulative_text, 
+                            return_tensors="pt", 
+                            truncation=True, 
+                            max_length=max_length,  # Use model's actual max length
+                            padding=False,
+                            add_special_tokens=True
+                        )            
             inputs = {k: v.to(model.device) for k, v in inputs.items()}
             
             # Get hidden states
@@ -43,7 +52,7 @@ def embed_text_qwen_all_layers(chunks, model, tokenizer, batch_size=1):
                 hidden_states = outputs.hidden_states[layer_idx]  # Shape: (batch, seq_len, hidden_size)
                 
                 # Get the last token's embedding (most recent context)
-                last_token_embedding = hidden_states[0, -1, :].cpu().numpy()
+                last_token_embedding = hidden_states[0, -1, :].float().cpu().numpy()
                 layer_embeddings.append(last_token_embedding)
         
         all_layers_embeddings.append(np.array(layer_embeddings))
