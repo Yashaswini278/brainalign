@@ -21,7 +21,7 @@ def embed_text_qwen_all_layers(chunks, model, tokenizer, batch_size=1):
     print(f"  Model max context length: {max_length}")
     print(f"  Number of layers: {num_layers}")
 
-    all_layers_embeddings = []
+    all_layers_embeddings = [[] for _ in range(num_layers)]
     cumulative_text = ""
     
         
